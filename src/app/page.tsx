@@ -1,6 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+
+// SpeechRecognition type declaration for TypeScript
+interface ISpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: any) => void) | null;
+  onerror: ((event: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
 import { Settings as SettingsIcon, Clock, Mic, Square, Loader2, Copy, Save, Trash2, Check } from 'lucide-react';
 import { ModeSelector } from '@/components/ModeSelector';
 import { Settings } from '@/components/Settings';
@@ -122,7 +141,7 @@ export default function Home() {
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingStartRef = useRef<number>(0);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   
   useEffect(() => {
@@ -538,11 +557,4 @@ export default function Home() {
       <History />
     </div>
   );
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
 }
