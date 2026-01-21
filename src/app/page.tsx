@@ -432,15 +432,15 @@ export default function Home() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(currentTranscript);
-                      setError(t('copied', language));
-                      setTimeout(() => setError(null), 2000);
+                      setErrorMessage(t('copied', language));
+                      setTimeout(() => setErrorMessage(''), 2000);
                     }}
                     className="text-xs px-3 py-1.5 rounded transition-all hover:bg-orange-500 hover:text-white"
                     style={{ background: '#262626', color: '#a1a1aa', border: '1px solid #404040' }}
                   >
                     {t('copyTranscript', language)}
                   </button>
-                  <div className="flex gap-6 text-xs" style={{ color: '#525252' }}>
+                  <div className="flex text-xs" style={{ color: '#525252', gap: '24px' }}>
                     <span>{currentTranscript.trim().split(/\s+/).filter(w => w.length > 0).length} {t('words', language)}</span>
                     <span>{currentTranscript.length} {t('characters', language)}</span>
                   </div>

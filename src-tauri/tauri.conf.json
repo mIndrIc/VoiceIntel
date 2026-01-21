@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "VoiceIntel",
+        "label": "main",
         "width": 600,
         "height": 500,
         "resizable": true,
@@ -20,8 +21,8 @@
         "center": true,
         "decorations": true,
         "transparent": false,
-        "minWidth": 500,
-        "minHeight": 400
+        "minWidth": 200,
+        "minHeight": 200
       }
     ],
     "security": {

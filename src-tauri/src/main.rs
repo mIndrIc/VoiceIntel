@@ -24,6 +24,40 @@ async fn copy_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), St
         .map_err(|e| e.to_string())
 }
 
+// Command to enter compact mode (small window, always on top)
+#[tauri::command]
+async fn enter_compact_mode(window: tauri::Window) -> Result<(), String> {
+    use tauri::LogicalSize;
+    
+    // Set always on top
+    window.set_always_on_top(true).map_err(|e| e.to_string())?;
+    
+    // Resize to compact size
+    window.set_size(LogicalSize::new(250.0, 280.0)).map_err(|e| e.to_string())?;
+    
+    // Center the window
+    window.center().map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+// Command to exit compact mode (normal window)
+#[tauri::command]
+async fn exit_compact_mode(window: tauri::Window) -> Result<(), String> {
+    use tauri::LogicalSize;
+    
+    // Disable always on top
+    window.set_always_on_top(false).map_err(|e| e.to_string())?;
+    
+    // Resize to normal size
+    window.set_size(LogicalSize::new(600.0, 500.0)).map_err(|e| e.to_string())?;
+    
+    // Center the window
+    window.center().map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -53,7 +87,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             trigger_recording,
-            copy_to_clipboard
+            copy_to_clipboard,
+            enter_compact_mode,
+            exit_compact_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
