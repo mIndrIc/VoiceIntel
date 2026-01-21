@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 // Helper function to copy text to clipboard (with Tauri fallback)
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -315,16 +316,41 @@ export default function Home() {
     else if (['idle', 'done', 'error'].includes(status)) startRecording();
   }, [status, startRecording, stopRecording]);
   
+  // Listen for global shortcut event from Tauri backend (Ctrl+Shift+V)
+  const lastShortcutTime = useRef<number>(0);
+  
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'V') {
-        e.preventDefault();
-        toggleRecording();
+    let unlisten: (() => void) | undefined;
+    
+    const setupListener = async () => {
+      try {
+        unlisten = await listen('start-recording', () => {
+          // Debounce: ignore if less than 500ms since last trigger
+          const now = Date.now();
+          if (now - lastShortcutTime.current < 500) {
+            console.log('Shortcut debounced');
+            return;
+          }
+          lastShortcutTime.current = now;
+          
+          // Only start if not already recording or processing
+          if (['idle', 'done', 'error'].includes(status)) {
+            startRecording();
+          } else if (status === 'recording') {
+            stopRecording();
+          }
+        });
+      } catch (e) {
+        console.log('Tauri event listener not available');
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleRecording]);
+    
+    setupListener();
+    
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [status, startRecording, stopRecording]);
   
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   const isProcessing = status === 'transcribing' || status === 'enriching';
