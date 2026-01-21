@@ -3,6 +3,7 @@
 import { Copy, Save, RotateCcw, Check } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 
 export function OutputDisplay() {
   const { 
@@ -20,7 +21,7 @@ export function OutputDisplay() {
   
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(enrichedOutput);
+      await invoke('copy_to_clipboard', { text: enrichedOutput });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {

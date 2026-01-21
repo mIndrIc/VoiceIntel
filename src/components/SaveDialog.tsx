@@ -3,7 +3,7 @@
 import { X, FileText, FileCode, File, Download } from 'lucide-react';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
-import { saveAs } from 'file-saver';
+import { invoke } from '@tauri-apps/api/core';
 
 type FileFormat = 'txt' | 'md' | 'pdf' | 'json';
 
@@ -77,89 +77,105 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
     return content;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const content = generateContent();
     const timestamp = new Date().toISOString().split('T')[0];
     const fullFileName = `${fileName}_${timestamp}`;
 
-    if (selectedFormat === 'pdf') {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      const maxWidth = pageWidth - margin * 2;
-      
-      // Title
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('VoiceIntel Export', margin, 25);
-      
-      // Metadata
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100);
-      doc.text(`Datum: ${new Date().toLocaleString('de-DE')}`, margin, 35);
-      doc.text(`Modus: ${mode}`, margin, 42);
-      
-      let yPosition = 55;
-      doc.setTextColor(0);
-      
-      // Transcript
-      if (includeTranscript && transcript) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Transkript', margin, yPosition);
-        yPosition += 8;
+    try {
+      if (selectedFormat === 'pdf') {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 20;
+        const maxWidth = pageWidth - margin * 2;
         
-        doc.setFontSize(11);
+        // Title
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('VoiceIntel Export', margin, 25);
+        
+        // Metadata
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const transcriptLines = doc.splitTextToSize(transcript, maxWidth);
-        transcriptLines.forEach((line: string) => {
-          if (yPosition > 270) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          doc.text(line, margin, yPosition);
-          yPosition += 6;
-        });
-        yPosition += 10;
-      }
-      
-      // Enriched Text
-      if (includeEnriched && enrichedText) {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
+        doc.setTextColor(100);
+        doc.text(`Datum: ${new Date().toLocaleString('de-DE')}`, margin, 35);
+        doc.text(`Modus: ${mode}`, margin, 42);
+        
+        let yPosition = 55;
+        doc.setTextColor(0);
+        
+        // Transcript
+        if (includeTranscript && transcript) {
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Transkript', margin, yPosition);
+          yPosition += 8;
+          
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'normal');
+          const transcriptLines = doc.splitTextToSize(transcript, maxWidth);
+          transcriptLines.forEach((line: string) => {
+            if (yPosition > 270) {
+              doc.addPage();
+              yPosition = 20;
+            }
+            doc.text(line, margin, yPosition);
+            yPosition += 6;
+          });
+          yPosition += 10;
         }
         
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(mode === 'Original' ? 'Original' : mode, margin, yPosition);
-        yPosition += 8;
-        
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'normal');
-        const enrichedLines = doc.splitTextToSize(enrichedText, maxWidth);
-        enrichedLines.forEach((line: string) => {
-          if (yPosition > 270) {
+        // Enriched Text
+        if (includeEnriched && enrichedText) {
+          if (yPosition > 250) {
             doc.addPage();
             yPosition = 20;
           }
-          doc.text(line, margin, yPosition);
-          yPosition += 6;
+          
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text(mode === 'Original' ? 'Original' : mode, margin, yPosition);
+          yPosition += 8;
+          
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'normal');
+          const enrichedLines = doc.splitTextToSize(enrichedText, maxWidth);
+          enrichedLines.forEach((line: string) => {
+            if (yPosition > 270) {
+              doc.addPage();
+              yPosition = 20;
+            }
+            doc.text(line, margin, yPosition);
+            yPosition += 6;
+          });
+        }
+        
+        // Get PDF as array buffer and convert to Uint8Array for Tauri
+        const pdfOutput = doc.output('arraybuffer');
+        const pdfBytes = Array.from(new Uint8Array(pdfOutput));
+        
+        await invoke('save_pdf_with_dialog', {
+          content: pdfBytes,
+          defaultName: `${fullFileName}.pdf`
+        });
+      } else {
+        // For text formats (txt, md, json)
+        const filterMap: Record<string, [string, string[]]> = {
+          txt: ['Textdatei', ['txt']],
+          md: ['Markdown', ['md']],
+          json: ['JSON', ['json']],
+        };
+        
+        const [filterName, filterExt] = filterMap[selectedFormat];
+        
+        await invoke('save_file_with_dialog', {
+          content: content,
+          defaultName: `${fullFileName}.${selectedFormat}`,
+          filters: [[filterName, filterExt]]
         });
       }
-      
-      doc.save(`${fullFileName}.pdf`);
-    } else {
-      const mimeTypes: Record<FileFormat, string> = {
-        txt: 'text/plain;charset=utf-8',
-        md: 'text/markdown;charset=utf-8',
-        json: 'application/json;charset=utf-8',
-        pdf: 'application/pdf',
-      };
-      
-      const blob = new Blob([content], { type: mimeTypes[selectedFormat] });
-      saveAs(blob, `${fullFileName}.${selectedFormat}`);
+    } catch (error) {
+      console.error('Save failed:', error);
     }
     
     onClose();

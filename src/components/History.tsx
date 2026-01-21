@@ -3,6 +3,7 @@
 import { X, Copy, Trash2, Clock, ChevronDown, ChevronUp, Check, FileText } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 
 export function History() {
   const { showHistory, toggleHistory, history, clearHistory } = useAppStore();
@@ -11,7 +12,7 @@ export function History() {
   
   const copyToClipboard = async (text: string, id: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await invoke('copy_to_clipboard', { text });
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (error) {

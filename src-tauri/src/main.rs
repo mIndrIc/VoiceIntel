@@ -2,11 +2,66 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{Manager, Emitter};
+use std::fs;
 
 // Tauri command to get recording status
 #[tauri::command]
 fn get_app_info() -> String {
     "VoiceIntel v0.1.0".to_string()
+}
+
+// Command to save file with dialog
+#[tauri::command]
+async fn save_file_with_dialog(
+    app: tauri::AppHandle,
+    content: String,
+    default_name: String,
+    filters: Vec<(String, Vec<String>)>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    let mut dialog = app.dialog().file().set_file_name(&default_name);
+    
+    for (name, extensions) in filters {
+        let ext_refs: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
+        dialog = dialog.add_filter(&name, &ext_refs);
+    }
+    
+    let file_path = dialog.blocking_save_file();
+    
+    match file_path {
+        Some(path) => {
+            let path_str = path.to_string();
+            fs::write(&path_str, content).map_err(|e| e.to_string())?;
+            Ok(Some(path_str))
+        }
+        None => Ok(None), // User cancelled
+    }
+}
+
+// Command to save PDF file with dialog
+#[tauri::command]
+async fn save_pdf_with_dialog(
+    app: tauri::AppHandle,
+    content: Vec<u8>,
+    default_name: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    let file_path = app.dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("PDF", &["pdf"])
+        .blocking_save_file();
+    
+    match file_path {
+        Some(path) => {
+            let path_str = path.to_string();
+            fs::write(&path_str, content).map_err(|e| e.to_string())?;
+            Ok(Some(path_str))
+        }
+        None => Ok(None), // User cancelled
+    }
 }
 
 // Command to trigger recording from hotkey
@@ -64,6 +119,8 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // Register global shortcut (Ctrl+Shift+V)
             #[cfg(desktop)]
@@ -89,7 +146,9 @@ fn main() {
             trigger_recording,
             copy_to_clipboard,
             enter_compact_mode,
-            exit_compact_mode
+            exit_compact_mode,
+            save_file_with_dialog,
+            save_pdf_with_dialog
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

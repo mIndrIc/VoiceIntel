@@ -1,6 +1,29 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+
+// Helper function to copy text to clipboard (with Tauri fallback)
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    // Try Tauri first
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+      await invoke('copy_to_clipboard', { text });
+      return true;
+    }
+  } catch (e) {
+    console.log('Tauri clipboard failed, trying navigator.clipboard');
+  }
+  
+  // Fallback to navigator.clipboard
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    console.error('All clipboard methods failed:', e);
+    return false;
+  }
+}
 
 // SpeechRecognition type declaration for TypeScript
 interface ISpeechRecognition {
@@ -40,12 +63,10 @@ function ResultButtons() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(enrichedOutput);
+    const success = await copyToClipboard(enrichedOutput);
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
     }
   };
   
@@ -447,18 +468,7 @@ export default function Home() {
                 <p className="text-base leading-relaxed text-white">
                   {currentTranscript}
                 </p>
-                <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid #262626' }}>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(currentTranscript);
-                      setErrorMessage(t('copied', language));
-                      setTimeout(() => setErrorMessage(''), 2000);
-                    }}
-                    className="text-xs px-3 py-1.5 rounded transition-all hover:bg-orange-500 hover:text-white"
-                    style={{ background: '#262626', color: '#a1a1aa', border: '1px solid #404040' }}
-                  >
-                    {t('copyTranscript', language)}
-                  </button>
+                <div className="flex items-center justify-end mt-3 pt-3" style={{ borderTop: '1px solid #262626' }}>
                   <div className="flex text-xs" style={{ color: '#525252', gap: '24px' }}>
                     <span>{currentTranscript.trim().split(/\s+/).filter(w => w.length > 0).length} {t('words', language)}</span>
                     <span>{currentTranscript.length} {t('characters', language)}</span>
