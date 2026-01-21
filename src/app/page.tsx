@@ -166,6 +166,14 @@ export default function Home() {
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   
+  // Refs to always have current values in event listeners
+  const statusRef = useRef(status);
+  const openaiApiKeyRef = useRef(openaiApiKey);
+  
+  // Keep refs in sync
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { openaiApiKeyRef.current = openaiApiKey; }, [openaiApiKey]);
+  
   useEffect(() => {
     const loadMics = async () => {
       try {
@@ -319,6 +327,12 @@ export default function Home() {
   // Listen for global shortcut event from Tauri backend (Ctrl+Shift+V)
   const lastShortcutTime = useRef<number>(0);
   
+  // Store functions in refs to avoid stale closures
+  const startRecordingRef = useRef(startRecording);
+  const stopRecordingRef = useRef(stopRecording);
+  useEffect(() => { startRecordingRef.current = startRecording; }, [startRecording]);
+  useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
+  
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     
@@ -333,11 +347,14 @@ export default function Home() {
           }
           lastShortcutTime.current = now;
           
+          // Use refs to get current values
+          const currentStatus = statusRef.current;
+          
           // Only start if not already recording or processing
-          if (['idle', 'done', 'error'].includes(status)) {
-            startRecording();
-          } else if (status === 'recording') {
-            stopRecording();
+          if (['idle', 'done', 'error'].includes(currentStatus)) {
+            startRecordingRef.current();
+          } else if (currentStatus === 'recording') {
+            stopRecordingRef.current();
           }
         });
       } catch (e) {
@@ -350,7 +367,7 @@ export default function Home() {
     return () => {
       if (unlisten) unlisten();
     };
-  }, [status, startRecording, stopRecording]);
+  }, []); // Empty deps - listener created once, refs always have current values
   
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   const isProcessing = status === 'transcribing' || status === 'enriching';
